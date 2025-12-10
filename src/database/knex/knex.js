@@ -5,14 +5,13 @@ const knex = require("knex");
 const sqlite_db = knex({
   client: "sqlite3",
   connection: {
-    filename: path.resolve(__dirname, "../sqlite/abbey-road.db")
+    filename: path.resolve(__dirname, "../sqlite/abbey-road.db"),
   },
-  useNullAsDefault: true
+  useNullAsDefault: true,
 });
 
 // exporting knex config
 
-module.exports={
-	sqlite_db: sqlite_db
-}
-
+module.exports = {
+  sqlite_db: sqlite_db,
+};

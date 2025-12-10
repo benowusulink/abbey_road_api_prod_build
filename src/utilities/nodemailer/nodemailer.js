@@ -6,14 +6,13 @@ const transporter = nodemailer.createTransport({
   secure: true,
   auth: {
     user: "abbeyroadsendemail@gmail.com",
-    pass: "LOnd_On123"  // use app password here
+    pass: "LOnd_On123", // use app password here
   },
   tls: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+  },
 });
 
-
-module.exports ={
-	transporter: transporter
-}
+module.exports = {
+  transporter: transporter,
+};
