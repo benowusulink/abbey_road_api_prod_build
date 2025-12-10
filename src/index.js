@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 
 const express = require('express');
 const app = express();
@@ -16,6 +17,60 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.use(cookieParser());
 app.use(cors())
 app.use(express.json());
+
+const multer = require('multer');
+
+const store_pdf_documents = multer.diskStorage({
+  destination: function (req, file, cb) {
+
+  	if(file.fieldname === 'board_members_pdf'){
+
+			cb(null,path.join(__dirname,"..","public","documentation","board_documents"));
+  	}
+  	if(file.fieldname === 'who_we_are_pdf'){
+  		cb(null,path.join(__dirname,"..","public","documentation","index-page"));
+
+  	}
+		
+  }
+  ,
+  filename: function (req, file, cb) {
+    cb(null, file.originalname);
+  }
+});
+
+const store_images = multer.diskStorage({
+  destination: function (req, file, cb) {
+
+  	if(file.fieldname === 'our_estates_image'){
+			cb(null,path.join(__dirname,"..","public","images","index-page","estate_section"));
+  	}
+  	else if(file.fieldname === 'service_image'){
+  		cb(null,path.join(__dirname,"..","public","images","index-page","services_section"));
+  	}
+  	else if(file.fieldname === "edited_image"){
+
+			cb(null,path.join(__dirname,"..","public","images","estate-page"));
+
+  	}
+   	else if(file.fieldname === "added_estate_images"){
+
+			cb(null,path.join(__dirname,"..","public","images","estate-page"));
+
+  	}
+  	else{
+  		return
+  	}
+  }
+  ,
+  filename: function (req, file, cb) {
+    cb(null, file.originalname);
+  }
+});
+
+const upload_pdf = multer({ storage: store_pdf_documents});
+const upload_images = multer({ storage: store_images});
+
 
 app.get("/api/services_page/fetch_anchor_tags",(req,res)=>{
 
@@ -488,7 +543,7 @@ app.post("/api/login-page/board_members_login", (req,res)=>{
 	})
 })
 
-// ADMINNNNNN
+// ADMINNNNNN BOARD MEMBERS
 
 app.get("/api/admin_board_members_page/fetch_board_members", (req,res)=>{
 
@@ -525,7 +580,7 @@ app.post("/api/admin_board_members_page/add_board_members",(req,res)=>{
 			password: hash
 		})
 		.then((data)=>{
-
+			console.log(data[0].username === req.body.username)
 			if(data[0].username === req.body.username){
 				res.status(200).json({
 					success: true
@@ -661,6 +716,918 @@ app.post("/api/admin_board_members_page/edit_board_members", (req,res)=>{
 	}
 
 })
+
+app.post("/api/admin_board_members_page/delete_board_members", (req,res)=>{
+
+	sqlite('board_members')
+	.where({
+		username: req.body.username
+	})
+	.del()
+	.then((data)=>{
+		console.log(data)
+		if(data === 1){
+			res.status(200).json({
+				success: true
+			})
+		}
+		else{
+			res.status(404).json({
+				success: false
+			})
+		}
+	})
+	.catch((err)=>{
+		console.log(err)
+		res.status(404).json({
+			success: false
+		})	
+	})
+})
+
+app.get("/api/admin_board_members_page/fetch_board_documents", (req,res)=>{
+
+	sqlite.select('*')
+	.from('board_members_documents')
+	.then((data)=>{
+
+		console.log(data)
+
+		if(data.length > 0){
+			res.status(200).json({
+				success: true,
+				documents: data
+			})
+		}
+		else{
+			res.status(404).json({
+				success: false
+			})
+		}
+	})
+	.catch((err)=>{
+		console.log(err)
+		res.status(404).json({
+			success:false
+		})
+	})
+})
+
+app.post("/api/admin_board_members_page/add_board_documents",
+	upload_pdf.single('board_members_pdf'),(req,res)=>{
+
+
+		// error uploading file or no file from client 
+		if(!req.file){
+			
+			console.log("error uploading file or no file to upload");
+
+			res.status(404).json({
+				success: false
+			})
+		}
+		// success uploading file & file from client
+		else{
+
+
+
+			const dev_url = `http://localhost:3001/documentation/board_documents/${req.file.filename}`;
+			const prod_url = `https://abbey-road-api.onrender.com/board_documents/${req.file.filename}`
+			const name =  req.file.filename
+
+			sqlite('board_members_documents')
+			.returning('name')
+			.insert({
+				development_url: dev_url,
+				production_url: prod_url,
+				name: name
+
+			})
+			.then((data)=>{
+
+				// success
+				if(data[0].name === name){
+
+					res.status(200).json({
+						success: true,
+						name: data[0].name
+					})
+				}
+				// fail 
+				else{
+					res.status(404).json({
+						success: false
+					})
+				}
+			})
+			.catch((err)=>{
+
+				console.log(err);
+
+				res.status(404).json({
+					success: false
+				})
+			})
+
+		}
+})
+
+app.post("/api/admin_board_members_page/delete_board_documents", (req,res)=>{
+
+	sqlite('board_members_documents')
+	.where({
+		name: req.body.document_name
+	})
+	.del()
+	.then((data)=>{
+		console.log(data)
+		if(data === 1){
+			res.status(200).json({
+				success: true
+			})
+		}
+		else{
+			res.status(404).json({
+				success: false
+			})
+		}
+	})
+	.catch((err)=>{
+		console.log(err)
+		res.status(404).json({
+			success: false
+		})	
+	})
+
+})
+
+// ADMINNNNNN HOME PAGE 
+
+app.get("/api/admin_home_page/fetch_who_we_are_documents", (req,res)=>{
+
+	sqlite('index_page_elements_table')
+	.where({
+		section: 'a_tag_elements'
+	})
+	.select('*')
+	.then((data)=>{
+
+		// success
+		if(data.length > 0){
+
+			console.log(data)
+
+			res.status(200).json({
+				success: true,
+				who_we_are_documents: data
+			})
+		}
+		// fail
+		else{
+
+			res.status(404).json({
+				success: false
+			})
+		}
+
+	})
+	.catch((err)=>{
+
+		console.log(err)
+
+		res.status(404).json({
+			success: false
+		})
+	})
+
+})
+
+app.put("/api/admin_home_page/edit_who_we_are_documents",
+	upload_pdf.single('who_we_are_pdf'),(req,res)=>{
+
+		// error uploading file or no file from client 
+		if(!req.file){
+			
+			console.log("error uploading file or no file to upload");
+
+			res.status(404).json({
+				success: false
+			})
+		}
+		// success uploading file & file from client
+		else{
+
+			fs.rm(path.join(__dirname,'..','public','documentation','index-page',req.body.old_document_name),
+				(err) => {
+
+				  if (err) {
+
+				  	console.log("couldnt delete file", err)
+
+				  	return res.status(404).json({
+				  		success: false
+				  	})
+				  }
+				  // success
+				  else{
+
+						const dev_url = `http://localhost:3001/documentation/index-page/${req.file.filename}`;
+						const prod_url = `https://abbey-road-api.onrender.com/index-page/${req.file.filename}`
+						const new_name =  req.file.filename
+						const id = req.body.a_tag_id
+
+						sqlite.transaction((trx) => {
+
+						  let result = null;
+
+						  return trx('index_page_elements_table')
+								.where({
+									id: id
+								})
+								.returning('title')
+								.update({
+									title: new_name,
+									development_src: dev_url,
+									production_src: prod_url
+								})
+						    .then((data) => {
+
+						      result = data;
+
+						      if(data[0].title === new_name){
+						      	return trx('index_page_elements_table')
+						        .where({
+											section: 'a_tag_elements'
+										})
+										.select('*')
+						      }
+						    })
+						    .then((data) => {
+						      result = data;
+						      return result; 
+						    });
+
+						})
+						.then((result) => {
+
+						  res.status(202).json({
+						  	success: true,
+						  	who_we_are_documents: result
+						  })
+						})
+						.catch((err) => {
+						  console.error(err);
+						  res.status(500).json({ 
+						  	success: false 
+						  });
+						});
+
+
+				  }
+			})
+		}
+	})
+
+app.get("/api/admin_home_page/fetch_our_estates_text",(req,res)=>{
+
+	sqlite('index_page_elements_table')
+	.where({
+		 id: 'index-section3-article1-div1-h3-p1'
+	})
+	.select('text')
+	.then((data)=>{
+
+		if(data.length > 0){
+
+			console.log(data[0].text)
+
+			res.status(200).json({
+				success: true,
+				our_estates_text: data[0].text
+			})
+		}
+		else{
+			res.status(404).json({
+				success: false
+			})
+		}
+	})
+	.catch((err)=>{
+		console.log(err)
+
+			res.status(404).json({
+				success: false
+			})
+	})
+	
+})
+
+app.put("/api/admin_home_page/edit_our_estates_text",(req,res)=>{
+
+	// text sent from client 
+	if(req.body.new_text){
+
+		sqlite('index_page_elements_table')
+		.where({
+			 id: 'index-section3-article1-div1-h3-p1'
+		})
+		.returning('text')
+		.update({
+			text: req.body.new_text
+		})
+		.then((data)=>{
+
+			if(data.length > 0){
+
+				res.status(200).json({
+					success: true,
+					our_estates_text: data[0].text
+				})
+			}
+			else{
+
+				res.status(404).json({
+					success: false
+				})
+			}
+
+		})
+		.catch((err)=>{
+
+			console.log(err)
+
+			res.status(404).json({
+				success: false
+			})
+		})
+
+	}
+	// no text sent from client 
+	else{
+
+			res.status(404).json({
+				success: false
+			})
+	}
+
+})
+
+app.get("/api/admin_home_page/fetch_our_estates_images", (req,res)=>{
+
+		sqlite('index_page_elements_table')
+		.where({
+			section: 'estate_elements'
+		})
+		.select('*')
+		.then((data)=>{
+
+			console.log(data)
+
+			if(data.length > 0){
+
+				res.status(200).json({
+					success: true,
+					our_estates_images: data
+				})
+			}
+			else{
+				res.status(404).json({
+					success:false
+				})
+			}
+		})
+		.catch((err)=>{
+			console.log(err)
+			res.status(404).json({
+				success:false
+			})
+		})
+})
+
+app.put("/api/admin_home_page/edit_our_estates_images",
+	upload_images.single("our_estates_image"),(req,res)=>{
+
+		// error uploading image or no file from client 
+		if(!req.file){
+			
+			console.log(" no image to upload");
+
+			res.status(404).json({
+				success: false
+			})
+		}
+		// success uploading file & file from client
+		else{
+
+			fs.rm(path.join(__dirname,"..","public","images","index-page","estate_section",req.body.image_id),
+				(err) => {
+
+				  if (err) {
+
+				  	console.log("couldnt delete img", err)
+
+				  	return res.status(404).json({
+				  		success: false
+				  	})
+				  }
+				  // success
+				  else{
+
+						const dev_url = `http://localhost:3001/images/index-page/estate_section/${req.file.filename}`;
+						const prod_url = `https://abbey-road-api.onrender.com/images/index-page/estate_section/${req.file.filename}`
+						const new_name =  req.file.filename
+						const old_name = req.body.image_id
+
+						sqlite('index_page_elements_table')
+						.where({
+							title: old_name
+						})
+						.returning('title')
+						.update({
+							title: new_name,
+							development_src: dev_url,
+							production_src: prod_url
+
+						})
+						.then((data)=>{
+
+							console.log(data)
+
+							if(data.length > 0){
+
+								res.status(200).json({
+									success: true
+								})
+							}
+							else{
+								res.status(404).json({
+									success: false
+								})
+							}
+
+						})
+						.catch((err)=>{
+
+							console.log(err)
+
+							res.status(404).json({
+								success: false
+							})
+						})
+
+					}
+
+			})
+		}
+
+})
+
+app.get("/api/admin_home_page/fetch_service_images", (req,res)=>{
+
+		sqlite('index_page_elements_table')
+		.where({
+			section: 'service_images'
+		})
+		.select('*')
+		.then((data)=>{
+
+			console.log(data)
+
+			if(data.length > 0){
+
+				res.status(200).json({
+					success: true,
+					service_images: data
+				})
+			}
+			else{
+				res.status(404).json({
+					success:false
+				})
+			}
+		})
+		.catch((err)=>{
+			console.log(err)
+			res.status(404).json({
+				success:false
+			})
+		})
+})
+
+app.put("/api/admin_home_page/edit_our_service_images",
+	upload_images.single("service_image"),(req,res)=>{
+
+		// error uploading image or no file from client 
+		if(!req.file){
+			
+			console.log(" no image to upload");
+
+			res.status(404).json({
+				success: false
+			})
+		}
+		// success uploading file & file from client
+		else{
+
+			fs.rm(path.join(__dirname,"..","public","images","index-page","services_section",req.body.old_image_name),
+				(err) => {
+
+				  if (err) {
+
+				  	console.log("couldnt delete img", err)
+
+				  	return res.status(404).json({
+				  		success: false
+				  	})
+				  }
+				  // success
+				  else{
+
+						const dev_url = `http://localhost:3001/images/index-page/services_section/${req.file.filename}`;
+						const prod_url = `https://abbey-road-api.onrender.com/images/index-page/services_section/${req.file.filename}`
+						const new_name =  req.file.filename
+						const old_name = req.body.old_image_name
+
+						sqlite('index_page_elements_table')
+						.where({
+							id: req.body.image_id
+						})
+						.returning('title')
+						.update({
+							text: new_name,
+							development_src: dev_url,
+							production_src: prod_url
+
+						})
+						.then((data)=>{
+
+							console.log(data)
+
+							if(data.length > 0){
+
+								res.status(200).json({
+									success: true
+								})
+							}
+							else{
+								res.status(404).json({
+									success: false
+								})
+							}
+
+						})
+						.catch((err)=>{
+
+							console.log(err)
+
+							res.status(404).json({
+								success: false
+							})
+						})
+
+					}
+
+			})
+		}
+})
+
+
+
+app.get("/api/admin_estates_page/fetch_estates", (req,res)=>{
+
+	// transaction to get all values from estate_page_images & estate_page_elements
+	// tables
+	sqlite.transaction((trx) => {
+
+	  const result = {};
+
+	  return trx('estate_page_images')
+	    .select('*')
+	    .from('estate_page_images')
+	    .then((data1) => {
+
+	    	if(data1.length > 0){
+	    		result.estate_page_images = data1;
+	    	}
+	    	else{
+	    		result.estate_page_images = null
+	    	}
+
+	      return trx('estate_page_elements')
+	        .select('*')
+	        .from('estate_page_elements')
+	    })
+	    .then((data2) => {
+
+	    	if(data2.length > 0){
+	    		result.estate_page_elements = data2;
+	    	}
+	    	else{
+	    		result.estate_page_elements = null
+	    	}
+
+	      return result; 
+	    });
+
+	})
+	.then((result) => {
+
+	// check if result exisits,is an object & had two array properties
+	  if (result &&
+	    typeof result === 'object' &&
+	    Array.isArray(result.estate_page_images) &&
+	    Array.isArray(result.estate_page_elements)){
+
+	    res.status(200).json({
+	      success: true,
+	      estates_array: result
+	    });
+	  } 
+	  else {
+
+	    res.status(404).json({
+	      success: false
+	    });
+	  }
+	})
+	.catch((err) => {
+
+	  console.error(err);
+
+	  	res.status(404).json({
+	      success: false
+	    });
+	})
+})
+
+app.put("/api/admin_estate_page/edit_selected_estate",
+	upload_images.single("edited_image"),(req,res)=>{
+
+		// no image from client 
+		if(!req.file){
+
+			if (Object.keys(req.body.updated_estate).length > 0) {
+
+
+
+				return sqlite('estate_page_elements')
+				.where(JSON.parse(req.body.category))
+				.returning('*')
+				.update(JSON.parse(req.body.updated_estate))
+				.then((data)=>{
+
+				  if(data.length > 0){
+
+				  	console.log(data)
+				  	res.status(200).json({
+				  		success: true,
+				  		updated_estate: data
+				  	})
+				  }
+				  else{
+				  	console.log("error")
+				  	res.status(404).json({
+				  		success:false
+				  	})
+				  }
+				})
+				.catch((err)=>{
+				  	res.status(404).json({
+				  		success:false
+				  	})
+				})
+			
+			}
+			else{
+
+				res.status(404).json({
+		  		success:false
+		  	})
+
+		}}
+		// success uploading file & file from client
+		else{
+
+			fs.rm(path.join(__dirname,"..","public","images","estate-page",`${JSON.parse(req.body.image_name)}`),
+				(err) => {
+
+				  if (err) {
+
+				  	console.log("couldnt delete img", err)
+
+				  	res.status(404).json({
+				  		success: false
+				  	})
+				  }
+				  // success
+				  else{
+
+					  	const dev_url = `http://localhost:3001/images/estate-page/${req.file.filename}`
+					  	const prod_url = `https://abbey-road-api.onrender.com/images/estate-page/${req.file.filename}`
+
+
+							sqlite.transaction((trx) => {
+
+							  return trx('estate_page_images')
+								.where({
+									estate_image_id: JSON.parse(req.body.image_name)
+								})
+								.returning('estate_category')
+								.update({
+									estate_image_production_url: prod_url,
+									estate_image_id: req.file.filename,
+									estate_image_development_url: dev_url,
+								})
+						    .then((data1) => {
+
+						    	if (Object.keys(JSON.parse(req.body.updated_estate)).length > 0) {
+
+							      return trx('estate_page_elements')
+											.where({
+												estate_title: data1[0].estate_category
+											})
+											.returning('*')
+											.update(JSON.parse(req.body.updated_estate))
+							    }
+							    else{
+
+							    	console.log("1449",data1)
+							    	return trx('estate_page_elements')
+											.where({
+												estate_title: data1[0].estate_category
+											})
+										.select('*')
+							    }
+						    })
+						  
+							})
+							.then((result) => {
+
+							  if(result.length > 0){
+
+							  	res.status(200).json({
+							  		success: true,
+							  		updated_estate: result
+							  	})
+							  }
+							  else{
+							  	res.status(404).json({
+							  		success:false
+							  	})
+							  }
+							  
+							})
+							.catch((err) => {
+							  console.error(err);
+
+							  res.status(404).json({
+							  	success:false
+							  })
+
+							});
+						}
+				})
+			}
+})
+
+app.post(
+  "/api/admin_estate_page/add_new_estate",
+  upload_images.array('added_estate_images', 10),
+  (req, res) => {
+    // No files
+    if (!req.files || req.files.length === 0) {
+      return res.status(500).json({ success: false });
+    }
+
+    // Start transaction
+    sqlite.transaction((trx) => {
+      // 1️⃣ Insert estate object
+      return trx('estate_page_elements')
+        .returning('estate_title')
+        .insert(JSON.parse(req.body.add_estate))
+        .then((insertedEstate) => {
+          // insertedEstate is an array of inserted rows (with estate_title)
+          const estateTitle = insertedEstate[0].estate_title;
+          const imagesInserts = [];
+
+          // 2️⃣ Loop through uploaded images
+          req.files.forEach((file,index) => {
+
+            const dev_url = `http://localhost:3001/images/estate-page/${file.filename}`;
+            const prod_url = `https://abbey-road-api.onrender.com/${file.filename}`;
+            const category = estateTitle;
+
+            imagesInserts.push({
+              estate_category: category,
+              estate_image_production_url: prod_url,
+              estate_image_development_url: dev_url,
+              estate_image_id: `${category}${index}`
+            });
+          });
+
+          // 3️⃣ Insert all images
+          return trx('estate_page_images')
+            .insert(imagesInserts)
+            .returning('*'); // returns the inserted rows
+        });
+    })
+    .then((insertedImages) => {
+      // 4️⃣ Success
+          	console.log("1535 SUCCESS")
+      res.json({ success: true, insertedImages });
+    })
+    .catch((err) => {
+      console.error(err);
+      console.log("1540 FAIL")
+      res.status(500).json({ success: false });
+    });
+  }
+);
+
+
+
+app.delete("/api/admin_estate_page/delete_estate", (req, res) => {
+
+    const estateName = req.body.name;
+
+    if (!estateName) {
+        return res.status(400).json({
+            success: false,
+            message: "Missing estate name"
+        });
+    }
+
+    sqlite.transaction((trx) => {
+
+        // 1️⃣ FIRST: Get all image paths for this estate (so we can delete files)
+        return trx("estate_page_images")
+            .where("estate_category", estateName)
+            .select(
+                "estate_image_development_url",
+                "estate_image_production_url"
+            )
+            .then((rows) => {
+
+                // calculate actual disk paths to delete
+                const filesToDelete = rows.map((row) => {
+                    const url = process.env.NODE_ENV === "production"
+                        ? row.estate_image_production_url
+                        : row.estate_image_development_url;
+
+                    // extract filename safely
+                    const filename = url.split("/").pop();
+
+                    return path.join(__dirname,"..","public/images/estate-page", filename);
+                });
+
+                // 🗑️ 2️⃣ DELETE all files on disk
+                filesToDelete.forEach((filepath) => {
+                    if (fs.existsSync(filepath)) {
+                        fs.unlinkSync(filepath); // delete file
+                    }
+                });
+
+                // 3️⃣ Delete estate page elements
+                return trx("estate_page_elements")
+                    .where("estate_title", estateName)
+                    .del();
+            })
+            .then(() => {
+
+                // 4️⃣ Delete all image records from DB
+                return trx("estate_page_images")
+                    .where("estate_category", estateName)
+                    .del();
+            });
+
+    }) // END transaction
+    .then(() => {
+        res.status(200).json({
+            success: true
+        });
+    })
+    .catch((error) => {
+        console.error(error);
+        res.status(500).json({
+            success: false
+        });
+    });
+
+});
+
+
+
+
+
+
+
+// ADMINNNNNN BOARD MEMBERS
+
+// ADMINNNNNN BOARD MEMBERS
+
+// ADMINNNNNN BOARD MEMBERS
+
+// ADMINNNNNN BOARD MEMBERS
 
 const PORT = process.env.PORT || 3001;
 
